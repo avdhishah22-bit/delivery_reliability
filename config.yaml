@@ -1,0 +1,19 @@
+seed: 42
+
+paths:
+  dataco: data/raw/DataCoSupplyChainDataset.csv
+  logistics: data/raw/dynamic_supply_chain_logistics_dataset.csv
+  processed: data/processed
+  models: models
+  figures: reports/figures
+
+split:
+  train: 0.70
+  val: 0.15   # test = remainder, always the most recent data
+
+# Decision-support thresholds (used by src/decision/rules.py)
+rules:
+  late_prob_expedite: 0.70
+  high_value_order: 200.0
+  eta_interval_wide_days: 3.0
+  risk_alert_level: High

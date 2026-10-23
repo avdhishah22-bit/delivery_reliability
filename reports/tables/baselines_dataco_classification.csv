@@ -1,0 +1,7 @@
+model,roc_auc,pr_auc,f1,precision,recall,threshold
+random forest (all features),0.774,0.837,0.726,0.594,0.936,0.305
+logistic regression (all features),0.748,0.819,0.718,0.599,0.895,0.309
+mode-only late rate,0.731,0.75,0.71,0.55,1.0,0.381
+logistic regression (no mode/scheduled),0.556,0.589,0.71,0.55,1.0,0.355
+random forest (no mode/scheduled),0.551,0.584,0.71,0.55,1.0,0.316
+constant (train late rate),0.5,0.55,0.71,0.55,1.0,0.549

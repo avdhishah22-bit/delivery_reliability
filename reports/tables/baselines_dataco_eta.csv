@@ -1,0 +1,5 @@
+model,mae,rmse,r2
+random forest,0.9695,1.2658,0.3879
+mean real days per mode,0.9808,1.2659,0.3878
+linear regression,0.9921,1.2667,0.3871
+predict scheduled days,1.2935,1.6,0.022
