@@ -1,0 +1,6 @@
+option,orders,within 0 days,within 1 days,within 2 days,within 3 days,within 4 days,within 5 days,within 6 days
+First Class,26513,0.0,0.0,1.0,1.0,1.0,1.0,1.0
+Same Day (before noon),4839,1.0,1.0,1.0,1.0,1.0,1.0,1.0
+Same Day (from noon),4454,0.0,1.0,1.0,1.0,1.0,1.0,1.0
+Second Class,33806,0.0,0.0,0.202,0.402,0.602,0.802,1.0
+Standard Class,103153,0.0,0.0,0.202,0.403,0.602,0.798,1.0

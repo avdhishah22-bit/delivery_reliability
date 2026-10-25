@@ -1,0 +1,4 @@
+rule,orders_flagged,share_of_orders,precision,recall,false_alarms_per_late_order_caught
+High-tier alert / re-promise,9699,0.374,0.898,0.584,0.113
+Warn customer (wide interval),20566,0.794,0.497,0.684,1.013
+Any action,25280,0.975,0.591,1.0,0.693

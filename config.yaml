@@ -3,6 +3,7 @@ seed: 42
 paths:
   dataco: data/raw/DataCoSupplyChainDataset.csv
   logistics: data/raw/dynamic_supply_chain_logistics_dataset.csv
+  smart_logistics: data/raw/smart_logistics_dataset.csv
   processed: data/processed
   models: models
   figures: reports/figures
@@ -17,3 +18,5 @@ rules:
   high_value_order: 200.0
   eta_interval_wide_days: 3.0
   risk_alert_level: High
+  tier_high_prob: 0.70   # calibrated P(late) at or above this -> High (Second Class sits near 0.80)
+  tier_low_prob: 0.20    # below this -> Low (Same Day before noon); in between -> Medium (Standard Class ~0.40)

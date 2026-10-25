@@ -1,0 +1,4 @@
+model,roc_auc,pr_auc,precision@80%recall,lift@top20%
+mode-only,0.746,0.84,0.653,1.65
+5-row lookup table,0.777,0.86,0.677,1.7
+LightGBM (notebook 04),0.779,0.86,0.677,1.71

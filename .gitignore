@@ -3,12 +3,14 @@
 venv/
 ENV/
 env/
+# models
+models/*.joblib
 
 # Python Bytecode and Cache Files
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.pyc
 # VS Code Folder & User Settings
 .vscode/
 

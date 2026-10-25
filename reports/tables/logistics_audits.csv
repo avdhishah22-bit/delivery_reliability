@@ -1,0 +1,16 @@
+dataset,check,result
+dynamic logistics (32k rows),largest |corr| between any raw column and any target,0.014
+dynamic logistics (32k rows),lag-1 autocorrelation of traffic / weather / delay (real series are high),"traffic +0.003, weather +0.001, delay +0.006"
+dynamic logistics (32k rows),"risk_classification == bins of disruption_likelihood_score (<0.3, <0.7, else)",100.0% agreement
+dynamic logistics (32k rows),time-split R2 for delivery_time_deviation from raw columns,-0.004
+dynamic logistics (32k rows),time-split R2 for delay_probability from raw columns,-0.015
+dynamic logistics (32k rows),time-split R2 for disruption_likelihood_score from raw columns,-0.011
+dynamic logistics (32k rows),risk class accuracy: always 'High Risk',0.760
+dynamic logistics (32k rows),"risk class accuracy, raw columns only",0.760
+dynamic logistics (32k rows),"risk class accuracy, raw + disruption_likelihood_score (leak)",1.000
+smart logistics (1k rows),Logistics_Delay == (Shipment_Status is Delayed) OR (Traffic_Status is Heavy),100.0% agreement
+smart logistics (1k rows),"5-fold ROC-AUC, all columns (leak)",1.000
+smart logistics (1k rows),5-fold ROC-AUC without Shipment_Status and Traffic_Status,0.488
+smart logistics (1k rows),Logistics_Delay_Reason vs delay (chi-square p-value; reason is filled in for on-time rows too),0.993
+smart logistics (1k rows),Asset_ID vs delay (chi-square p-value),0.481
+smart logistics (1k rows),numeric columns: largest |corr| with delay,0.063

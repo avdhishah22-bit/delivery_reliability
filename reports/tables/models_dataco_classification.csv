@@ -1,0 +1,7 @@
+population,model,roc_auc,pr_auc,precision@80%recall,lift@top20%
+all orders,mode-only late rate,0.731,0.75,0.623,1.64
+all orders,random forest,0.774,0.837,0.66,1.69
+all orders,LightGBM (tuned),0.775,0.839,0.658,1.7
+shipped only,mode-only late rate,0.746,0.788,0.653,1.65
+shipped only,random forest,0.778,0.859,0.677,1.69
+shipped only,LightGBM (tuned),0.779,0.86,0.677,1.71

@@ -20,6 +20,16 @@ LEAKY_DATACO = [
     "shipping date (DateOrders)",
 ]
 
+# Cancelled / suspected-fraud orders never ship. DataCo labels them Late_delivery_risk = 0,
+# which mixes "cancelled" into "on time". Payment type TRANSFER is the only type that has them.
+CANCELLED_STATUS = "Shipping canceled"
+
+
+def shipped_only(df: pd.DataFrame) -> pd.DataFrame:
+    """Drop cancelled orders. Use for evaluation of 'late given it ships' and for ETA."""
+    return df[df["Delivery Status"] != CANCELLED_STATUS].reset_index(drop=True)
+
+
 DATACO_CAT = [
     "Type", "Shipping Mode", "Market", "Order Region", "Customer Segment",
     "Department Name", "Category Name",
