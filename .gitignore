@@ -23,3 +23,6 @@ Thumbs.db
 
 # Environment Variables & Secrets
 .env
+#data
+data/interim/*
+data/processed/*
