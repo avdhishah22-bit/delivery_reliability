@@ -3,9 +3,11 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-MODE_COLORS = {"Same Day": "#8b5cf6", "First Class": "#0ea5e9", "Second Class": "#f59e0b", "Standard Class": "#10b981"}
-TIER_COLORS = {"High": "#ef4444", "Medium": "#f59e0b", "Low": "#22c55e"}
-GOOD, BAD, NEUTRAL = "#22c55e", "#ef4444", "#64748b"
+INK, SIGNAL = "#1B2A3A", "#FFC633"
+MODE_COLORS = {"Same Day": "#6D5A9C", "First Class": "#1F7A8C", "Second Class": "#D08A1E", "Standard Class": "#4F6D8F"}
+TIER_COLORS = {"High": "#C8372D", "Medium": "#E0A52A", "Low": "#2E7D5B"}
+GOOD, BAD, NEUTRAL = "#2E7D5B", "#C8372D", "#6B7783"
+HEAT = [[0, "#E7F0EC"], [0.5, "#F4DFA0"], [1, "#C8372D"]]
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
@@ -16,14 +18,39 @@ def mode_color(name: str) -> str:
 def _style(fig: go.Figure, height: int = 360, legend: bool = True) -> go.Figure:
     fig.update_layout(height=height, margin=dict(l=10, r=10, t=40, b=10), showlegend=legend,
                       paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                      font=dict(size=13), legend=dict(orientation="h", y=-0.2),
-                      hoverlabel=dict(font_size=13))
-    fig.update_xaxes(gridcolor="rgba(128,128,128,0.18)", zerolinecolor="rgba(128,128,128,0.3)")
-    fig.update_yaxes(gridcolor="rgba(128,128,128,0.18)", zerolinecolor="rgba(128,128,128,0.3)")
+                      font=dict(size=14, family="IBM Plex Sans, system-ui, sans-serif", color=INK),
+                      legend=dict(orientation="h", y=-0.22, x=0), hoverlabel=dict(font_size=13),
+                      title=dict(x=0, xanchor="left", font=dict(size=21, family="Barlow Condensed, sans-serif")))
+    fig.update_xaxes(gridcolor="#DDE3E9", zerolinecolor="#C4CDD6", linecolor="#C4CDD6")
+    fig.update_yaxes(gridcolor="#DDE3E9", zerolinecolor="#C4CDD6", linecolor="#C4CDD6")
     return fig
 
 
 # ------------------------------------------------------------ shipping modes
+def promise_gap_chart(sc: pd.DataFrame) -> go.Figure:
+    """Tracking board: hollow dot = promised days, filled dot = average real days."""
+    order = list(sc.sort_values("mean_real_days").index)
+    fig = go.Figure()
+    for m in order:
+        p, r = sc.loc[m, "promised_days"], sc.loc[m, "mean_real_days"]
+        fig.add_trace(go.Scatter(x=[p, r], y=[m, m], mode="lines", showlegend=False, hoverinfo="skip",
+                                 line=dict(color=BAD if r > p + 0.05 else GOOD, width=7)))
+    fig.add_trace(go.Scatter(x=[sc.loc[m, "promised_days"] for m in order], y=order, mode="markers", name="Promised",
+                             marker=dict(symbol="circle-open", size=20, color=INK, line=dict(width=3, color=INK)),
+                             hovertemplate="%{y} promises %{x:.0f} day(s)<extra></extra>"))
+    fig.add_trace(go.Scatter(x=[sc.loc[m, "mean_real_days"] for m in order], y=order, mode="markers",
+                             name="Takes on average", marker=dict(size=17, color=INK),
+                             hovertemplate="%{y} takes %{x:.2f} days on average<extra></extra>"))
+    for m in order:
+        late = sc.loc[m, "late_rate"]
+        fig.add_annotation(x=6.7, y=m, text=f"<b>{late:.0%}</b> late", showarrow=False, xanchor="left",
+                           font=dict(size=16, color=BAD if late > 0.5 else INK))
+    fig.update_xaxes(range=[-0.4, 7.9], dtick=1, title="Days after the order is placed")
+    fig.update_yaxes(autorange="reversed")
+    fig.update_layout(title="What each option promises and what it delivers")
+    return _style(fig, 340)
+
+
 def late_rate_bars(sc: pd.DataFrame) -> go.Figure:
     sc = sc.sort_values("late_rate")
     fig = go.Figure(go.Bar(
@@ -82,9 +109,9 @@ def gauge(p: float, low: float, high: float) -> go.Figure:
     fig = go.Figure(go.Indicator(
         mode="gauge+number", value=p * 100, number={"suffix": "%", "font": {"size": 44}},
         gauge={"axis": {"range": [0, 100]}, "bar": {"color": TIER_COLORS[tier], "thickness": 0.35},
-               "steps": [{"range": [0, low * 100], "color": "rgba(34,197,94,0.18)"},
-                         {"range": [low * 100, high * 100], "color": "rgba(245,158,11,0.18)"},
-                         {"range": [high * 100, 100], "color": "rgba(239,68,68,0.18)"}]}))
+               "steps": [{"range": [0, low * 100], "color": "rgba(46,125,91,0.16)"},
+                         {"range": [low * 100, high * 100], "color": "rgba(224,165,42,0.20)"},
+                         {"range": [high * 100, 100], "color": "rgba(200,55,45,0.16)"}]}))
     fig.update_layout(title="Chance this order is late")
     return _style(fig, 270, legend=False)
 
@@ -92,9 +119,9 @@ def gauge(p: float, low: float, high: float) -> go.Figure:
 def delivery_timeline(lo: float, hi: float, point: float, promised: int) -> go.Figure:
     fig = go.Figure()
     fig.add_shape(type="rect", x0=lo - 0.4, x1=hi + 0.4, y0=0.25, y1=0.75,
-                  fillcolor="rgba(14,165,233,0.35)", line=dict(color="#0ea5e9", width=2))
+                  fillcolor="rgba(31,122,140,0.28)", line=dict(color="#1F7A8C", width=2))
     fig.add_trace(go.Scatter(x=[point], y=[0.5], mode="markers", name="Expected",
-                             marker=dict(size=16, color="#0ea5e9", symbol="diamond"),
+                             marker=dict(size=16, color="#1F7A8C", symbol="diamond"),
                              hovertemplate="Expected: %{x:.1f} days<extra></extra>"))
     fig.add_vline(x=promised + 0.5, line_dash="dash", line_color=BAD,
                   annotation_text=f"promised: {promised} d", annotation_position="top")
@@ -107,7 +134,7 @@ def delivery_timeline(lo: float, hi: float, point: float, promised: int) -> go.F
 def driver_bars(contrib: pd.Series) -> go.Figure:
     s = contrib.iloc[::-1]
     fig = go.Figure(go.Bar(x=s.values, y=list(s.index), orientation="h",
-                           marker_color=[BAD if v > 0 else "#38bdf8" for v in s.values],
+                           marker_color=[BAD if v > 0 else "#6FA8BF" for v in s.values],
                            hovertemplate="%{y}<br>%{x:+.2f} log-odds<extra></extra>"))
     fig.update_xaxes(title="Pushes risk UP (red) / DOWN (blue)")
     fig.update_layout(title="What drives this order's score")
@@ -120,7 +147,7 @@ def compare_modes_fig(t: pd.DataFrame) -> go.Figure:
                 marker_color=[mode_color(m) for m in t["Shipping mode"]],
                 text=[f"{v:.0%}" for v in t["P(late) model"]], textposition="outside")
     fig.add_trace(go.Scatter(x=t["Shipping mode"], y=t["P(late) lookup"] * 100, mode="markers", name="Lookup table",
-                             marker=dict(symbol="line-ew", size=26, line=dict(width=3, color="#111827"))))
+                             marker=dict(symbol="line-ew", size=26, line=dict(width=3, color=INK))))
     fig.update_yaxes(title="Chance of being late (%)", range=[0, 118])
     fig.update_layout(title="Same order, every shipping option")
     return _style(fig, 340)
@@ -129,9 +156,9 @@ def compare_modes_fig(t: pd.DataFrame) -> go.Figure:
 # --------------------------------------------------------- early warning
 def sweep_fig(sweep: pd.DataFrame, thr: float) -> go.Figure:
     fig = go.Figure()
-    for col, name, color in (("precision", "Precision (flagged orders that are late)", "#6366f1"),
-                             ("recall", "Recall (late orders caught)", "#f59e0b"),
-                             ("flagged_share", "Share of orders flagged", "#94a3b8")):
+    for col, name, color in (("precision", "Precision (flagged orders that are late)", INK),
+                             ("recall", "Recall (late orders caught)", "#E0A52A"),
+                             ("flagged_share", "Share of orders flagged", "#9AA5B1")):
         fig.add_trace(go.Scatter(x=sweep["threshold"], y=sweep[col] * 100, name=name, mode="lines",
                                  line=dict(width=3, color=color, shape="hv")))
     fig.add_vline(x=thr, line_dash="dash", line_color=BAD, annotation_text=f"threshold {thr:.2f}")
@@ -145,7 +172,7 @@ def outcome_bars(m: dict) -> go.Figure:
     fig = go.Figure(go.Bar(
         x=["Late orders caught", "Late orders missed", "False alarms"],
         y=[m["tp"], m["late"] - m["tp"], m["false_alarms"]],
-        marker_color=[GOOD, "#f59e0b", BAD], text=[f"{v:,.0f}" for v in (m["tp"], m["late"] - m["tp"], m["false_alarms"])],
+        marker_color=[GOOD, "#E0A52A", BAD], text=[f"{v:,.0f}" for v in (m["tp"], m["late"] - m["tp"], m["false_alarms"])],
         textposition="outside"))
     fig.update_layout(title="What the alert does to these orders")
     return _style(fig, 300, legend=False)
@@ -156,7 +183,7 @@ def cost_waterfall(gross: float, action_cost: float) -> go.Figure:
         x=["Late-delivery cost avoided", "Cost of acting on alerts", "Net per month"],
         y=[gross, -action_cost, 0], measure=["relative", "relative", "total"],
         increasing=dict(marker=dict(color=GOOD)), decreasing=dict(marker=dict(color=BAD)),
-        totals=dict(marker=dict(color="#6366f1")), connector=dict(line=dict(color=NEUTRAL))))
+        totals=dict(marker=dict(color=INK)), connector=dict(line=dict(color=NEUTRAL))))
     fig.update_layout(title="Illustrative monthly value of the alert")
     return _style(fig, 320, legend=False)
 
@@ -165,7 +192,7 @@ def cost_waterfall(gross: float, action_cost: float) -> go.Figure:
 def heatmap(pivot: pd.DataFrame, title: str, as_percent: bool = True, text: bool = True) -> go.Figure:
     z = pivot.values * (100 if as_percent else 1)
     labels = [["" if np.isnan(v) else f"{v:.0f}" for v in row] for row in z] if text else None
-    fig = go.Figure(go.Heatmap(z=z, x=list(pivot.columns), y=list(pivot.index), colorscale="RdYlGn_r",
+    fig = go.Figure(go.Heatmap(z=z, x=list(pivot.columns), y=list(pivot.index), colorscale=HEAT,
                                zmin=0, zmax=100 if as_percent else None, text=labels,
                                texttemplate="%{text}" if text else None, colorbar=dict(title="% late"),
                                hovertemplate="%{y} / %{x}<br>%{z:.1f}% late<extra></extra>"))
@@ -176,7 +203,7 @@ def heatmap(pivot: pd.DataFrame, title: str, as_percent: bool = True, text: bool
 def hour_weekday_heatmap(t: pd.DataFrame, title: str) -> go.Figure:
     z = t.pivot_table(index="order_weekday", columns="order_hour", values="late_rate")
     z = z.reindex(index=range(7), columns=range(24))
-    fig = go.Figure(go.Heatmap(z=z.values * 100, x=list(range(24)), y=WEEKDAYS, colorscale="RdYlGn_r",
+    fig = go.Figure(go.Heatmap(z=z.values * 100, x=list(range(24)), y=WEEKDAYS, colorscale=HEAT,
                                zmin=0, zmax=100, colorbar=dict(title="% late"),
                                hovertemplate="%{y} %{x}:00<br>%{z:.1f}% late<extra></extra>"))
     fig.update_xaxes(title="Hour the order was placed", dtick=2)
@@ -200,7 +227,7 @@ def monthly_lines(monthly: pd.DataFrame, modes: list, value: str = "late_rate") 
 
 def gap_bars(t: pd.DataFrame, name: str, min_orders: int = 300) -> go.Figure:
     t = t[t["orders"] >= min_orders].sort_values("gap")
-    colors = [BAD if g > 0 else "#38bdf8" for g in t["gap"]]
+    colors = [BAD if g > 0 else "#6FA8BF" for g in t["gap"]]
     fig = go.Figure(go.Bar(
         x=t["gap"] * 100, y=t[name].astype(str), orientation="h", marker_color=colors,
         customdata=np.c_[t["late_rate"] * 100, t["expected"] * 100, t["orders"], t["z"]],
@@ -213,7 +240,7 @@ def gap_bars(t: pd.DataFrame, name: str, min_orders: int = 300) -> go.Figure:
 
 # ------------------------------------------------------------- model lab
 def roc_fig(roc: dict) -> go.Figure:
-    colors = {"Calibrated LightGBM": "#6366f1", "5-row lookup table": "#f59e0b", "Shipping mode only": "#94a3b8"}
+    colors = {"Calibrated LightGBM": INK, "5-row lookup table": "#E0A52A", "Shipping mode only": "#9AA5B1"}
     fig = go.Figure(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", name="Coin flip",
                                line=dict(dash="dot", color=NEUTRAL)))
     for name, r in roc.items():
@@ -227,7 +254,7 @@ def roc_fig(roc: dict) -> go.Figure:
 def calibration_fig(cal: pd.DataFrame) -> go.Figure:
     fig = go.Figure(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", name="Perfect", line=dict(dash="dot", color=NEUTRAL)))
     fig.add_trace(go.Scatter(x=cal["predicted"], y=cal["observed"], mode="markers+lines", name="Model",
-                             marker=dict(size=np.clip(np.sqrt(cal["orders"]) / 4, 8, 40), color="#6366f1"),
+                             marker=dict(size=np.clip(np.sqrt(cal["orders"]) / 4, 8, 40), color=INK),
                              customdata=cal["orders"], hovertemplate="Said %{x:.0%}, actually %{y:.0%}<br>%{customdata:,} orders<extra></extra>"))
     fig.update_xaxes(title="Predicted chance of late", tickformat=".0%")
     fig.update_yaxes(title="Observed late rate", tickformat=".0%")
@@ -236,7 +263,7 @@ def calibration_fig(cal: pd.DataFrame) -> go.Figure:
 
 
 def split_timeline(info: dict) -> go.Figure:
-    colors = {"Train": "#6366f1", "Validation": "#f59e0b", "Test": "#22c55e"}
+    colors = {"Train": INK, "Validation": "#E0A52A", "Test": GOOD}
     fig = go.Figure()
     for name, d in info.items():
         start, end = pd.Timestamp(d["start"]), pd.Timestamp(d["end"])
@@ -270,7 +297,7 @@ def promise_curves(dist: pd.DataFrame, promises: dict) -> go.Figure:
         cur = promises.get(opt)
         if cur is not None:
             fig.add_trace(go.Scatter(x=[cur], y=[late[days.index(cur)]], mode="markers", showlegend=False,
-                                     marker=dict(size=16, color=mode_color(opt), line=dict(width=3, color="#111827")),
+                                     marker=dict(size=16, color=mode_color(opt), line=dict(width=3, color=INK)),
                                      hovertemplate=f"{opt}: current promise {cur} d<extra></extra>"))
     fig.update_xaxes(title="Days promised to the customer", dtick=1)
     fig.update_yaxes(title="Late deliveries (%)", range=[-3, 105])

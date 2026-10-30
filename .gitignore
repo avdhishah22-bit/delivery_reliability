@@ -5,7 +5,9 @@ ENV/
 env/
 # models
 models/*.joblib
-
+!models/app_artifacts.joblib
+!models/late_delivery_lgbm.joblib
+!models/eta_lgbm.joblib
 # Python Bytecode and Cache Files
 __pycache__/
 *.py[cod]
