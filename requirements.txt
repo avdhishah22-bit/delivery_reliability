@@ -1,0 +1,16 @@
+# Core
+pandas
+numpy
+scikit-learn
+scipy
+lightgbm
+joblib
+# Notebooks
+matplotlib
+# App
+streamlit>=1.40
+plotly
+# Tests
+pytest
+# For Streamlit Cloud: pin the exact versions you trained with (see README, "Deploy"),
+# because the saved models in models/ must be loaded by the same library versions.
