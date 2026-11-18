@@ -433,7 +433,7 @@ def page_evidence():
     with c[1]:
         kpi("Folds where the model wins", f"{ahead} of {len(roll)}", "rolling time windows")
     with c[2]:
-        kpi("Best net-benefit gap", f"{(dc['LightGBM (calibrated)'] - dc['5-row table']).abs().max():.4f}", "model against table, any threshold")
+        kpi("Largest net-benefit gap", f"{(dc['LightGBM (calibrated)'] - dc['5-row table']).abs().max():.4f}", "model against table, any threshold")
     inside = evidence["within_mode"]
     std = inside[inside["shipping mode"] == "Standard Class"]
     with c[3]:
@@ -468,14 +468,18 @@ def page_evidence():
     top = float(dc[["LightGBM (calibrated)", "5-row table"]].max().max())
     fig.update_layout(xaxis_title="alert threshold", yaxis_title="net benefit per order", yaxis_range=[-0.1, top * 1.15], xaxis_tickformat=".0%")
     chart(style(fig, 340))
-    aside("The two lines lie on top of each other: using the model instead of the table changes no decision. "
+    gap = float((dc["LightGBM (calibrated)"] - dc["5-row table"]).abs().max())
+    aside(f"The two lines almost coincide (largest gap {gap:.4f} per order): using the model instead of the table changes no decision. "
           "Flagging every order is worse than doing nothing once the threshold passes the overall late rate.")
 
     section("4. Is it equally good for every group?")
     st.markdown("**Inside one shipping option.** The table gives every order in an option the same score (AUC 0.5), except Same Day, which it splits at noon. "
                 "If the model found anything beyond the promise, its AUC would rise above 0.5.")
-    st.dataframe(inside.style.format({"late rate": "{:.0%}", "LightGBM AUC inside the option": "{:.3f}", "table AUC inside the option": "{:.3f}"}, na_rep="-"),
-                 hide_index=True)
+    show = inside.copy()
+    show["late rate"] = show["late rate"].map("{:.0%}".format)
+    for col in ("LightGBM AUC inside the option", "table AUC inside the option"):
+        show[col] = show[col].map(lambda v: "-" if pd.isna(v) else f"{v:.3f}")
+    st.dataframe(show, hide_index=True)
     st.markdown("**By region.** Groups with at least 300 test orders. Calibration error is the average gap between predicted and observed late rate.")
     reg = evidence["region"]
     fmt = {c: "{:.3f}" for c in reg.columns if c not in ("orders", "Order Region", "note", "late rate")}

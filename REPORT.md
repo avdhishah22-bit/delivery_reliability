@@ -177,7 +177,7 @@ Notebook 4 asks whether "the table matches the model" is solid or just one lucky
 |---|---|---|
 | Is the gap noise? | Bootstrap, resampling whole orders (500 draws), paired on the same resample | LightGBM 0.7786 [0.7696, 0.7877], table 0.7766 [0.7695, 0.7844]; difference +0.0020 [-0.0028, +0.0066], includes 0 |
 | Does it depend on the cut? | Rolling-origin validation, 5 expanding windows, settings fixed | Mean difference +0.0003, standard deviation 0.0050; model ahead in 2 of 5 folds (range -0.0040 to +0.0077) |
-| Does acting on the model pay more? | Decision curve (net benefit, Vickers and Elkin 2006) | Equal within 0.0005 at every threshold (0.3024 against 0.3024 at t = 0.5; 0.2498 against 0.2503 at t = 0.7) |
+| Does acting on the model pay more? | Decision curve (net benefit, Vickers and Elkin 2006) | Differ by at most 0.0032 per order at any of 19 thresholds (0.05 to 0.95), and by under 0.0005 at the six thresholds printed in the notebook (0.3024 against 0.3024 at t = 0.5; 0.2498 against 0.2503 at t = 0.7) |
 | Anything beyond the promise? | AUC inside one shipping option | Second Class 0.505, Standard Class 0.505 (table 0.5); Same Day 1.0 for both through the noon cut-off |
 | Equal for all groups? | Calibration error and AUC by market and region (groups of 300+ orders) | Calibration error 0.005 to 0.021 everywhere except South America (592 orders): 0.057, with model AUC 0.685 below the table's 0.713 |
 | Stable in operation? | Population stability index (PSI), train against test | Market 3.19 and Department 1.14 (large shifts), Product Price 0.10 and Quantity 0.15 (moderate); model score 0.057 (stable); quarterly late rate 0.56 to 0.59 |
@@ -250,7 +250,7 @@ Every run that changed a decision or a number, in order. Test-set numbers are on
 | 14 | 3 | Evaluated the rules on the test split | High-tier alert: 37.9% flagged, precision 0.898, recall 0.591, 0.114 false alarms per late order caught | The High-tier alert is the useful rule; the wide-window warning is a delivery-window message |
 | 15 | 4 | Bootstrap (500 draws, whole orders) on LightGBM against the 5-row table | Difference +0.0020, 95% interval -0.0028 to +0.0066 | Gap is not distinguishable from zero; the table is preferred for use |
 | 16 | 4 | Rolling-origin validation, 5 expanding windows | Mean difference +0.0003, standard deviation 0.0050; model ahead in 2 of 5 folds | Conclusion does not depend on the split point |
-| 17 | 4 | Decision curve, thresholds 0.05 to 0.95 | Net benefit equal within 0.0005 | No decision is changed by using the model |
+| 17 | 4 | Decision curve, thresholds 0.05 to 0.95 | Net benefit differs by at most 0.0032 per order at any threshold | No decision is changed by using the model |
 | 18 | 4 | AUC inside each shipping option; calibration and AUC by market and region | Second and Standard Class 0.505; South America (592 orders) calibration error 0.057, model AUC 0.685 against table 0.713 | Nothing beyond the promise; keep the fall-back to the table for small groups |
 | 19 | 4 | PSI, train against test | Market 3.19, Department 1.14, score 0.057, quarterly late rate 0.56 to 0.59 | Input drift is not performance drift; monitor score PSI and late rate, and note the test period is mostly two markets |
 

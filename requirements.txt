@@ -1,16 +1,14 @@
 # Core
-pandas
-numpy
-scikit-learn
-scipy
-lightgbm
-joblib
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.1
+scipy==1.13.1
+lightgbm==4.7.0
+joblib==1.4.2
 # Notebooks
-matplotlib
+matplotlib==3.9.2
 # App
-streamlit>=1.40
-plotly
+streamlit==1.67.0
+plotly==5.24.1
 # Tests
-pytest
-# For Streamlit Cloud: pin the exact versions you trained with (see README, "Deploy"),
-# because the saved models in models/ must be loaded by the same library versions.
+pytest==7.4.4
