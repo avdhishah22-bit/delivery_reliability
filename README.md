@@ -25,7 +25,7 @@ Details and the experiment log are in [`REPORT.md`](REPORT.md).
 data/raw/*.csv
      |
      v   core.py  (load, repair dates, features, time split)
- 1_understand_the_data.ipynb     find the traps, measure each shipping option
+ understand_the_data.ipynb     find the traps, measure each shipping option
      |
      v
  2_build_and_test_models.ipynb   baselines -> LightGBM, delivery-time windows      -> models/models.joblib
@@ -44,9 +44,10 @@ delivery_reliability/
 ├── README.md                       this file
 ├── REPORT.md                       final report, experiment log, who did what
 ├── core.py                         ALL the logic (9 labelled sections); notebooks and app import it
-├── 1_understand_the_data.ipynb     notebook 1
-├── 2_build_and_test_models.ipynb   notebook 2
-├── 3_early_warning.ipynb           notebook 3
+├── 1_data_and_reliability.ipynb     notebook 1
+├── 2_modelling_and_baseline.ipynb   notebook 2
+├── 3_calibration_and_early_warning.ipynb           notebook 3
+├── 4_robustness_and_validation.ipynb     notebook 4
 ├── app.py                          Streamlit app (5 pages)
 ├── test_core.py                    unit tests for core.py
 ├── requirements.txt

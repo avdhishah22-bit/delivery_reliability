@@ -266,3 +266,4 @@ def test_calibration_error_and_psi():
     assert psi(a, r.normal(size=5000)) < 0.05
     assert psi(a, r.normal(2, 1, 5000)) > 0.25
     assert psi(pd.Series(["x"] * 90 + ["y"] * 10), pd.Series(["x"] * 50 + ["y"] * 50)) > 0.25
+    
