@@ -1,0 +1,4 @@
+,coverage,mean_width,cov_First Class,width_First Class,cov_Same Day,width_Same Day,cov_Second Class,width_Second Class,cov_Standard Class,width_Standard Class
+empirical per-mode quantiles,1.0,3.23,1.0,0.0,1.0,1.0,1.0,4.0,1.0,4.0
+LightGBM quantile regression,0.929,3.245,0.978,0.178,0.938,1.19,0.704,3.893,0.991,3.998
+split conformal (per mode),0.797,3.191,0.784,0.086,0.829,0.112,0.801,3.999,0.796,3.997

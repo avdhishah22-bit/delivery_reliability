@@ -22,7 +22,11 @@ The main findings:
 6. **The conclusion survives stress tests.** The model-minus-table AUC gap is +0.002 with a 95% interval of -0.003 to +0.007
    (includes zero); across five rolling time windows the model wins 2 and loses 3; and inside any one shipping option the
    model ranks orders no better than chance (AUC 0.505). Details in section 5.7.
-7. **The high-risk alert is precise.** It flags 37.9% of orders; 89.8% of them are late, and it catches 59.1% of all late
+7. **A late delivery does not change whether customers order again.** Inside Standard and Second Class the real delivery
+   time is random (2 to 6 days), which makes a natural experiment. Each extra day changes the chance of ordering again within
+   90 days by -0.06 points (95% interval -0.36 to +0.24; the data could have detected 0.43), with balance and placebo tests
+   clean. Details in section 5.8.
+8. **The high-risk alert is precise.** It flags 37.9% of orders; 89.8% of them are late, and it catches 59.1% of all late
    orders with 0.11 false alarms per late order caught.
 
 These results are reported as they are. The model is valuable for showing how lateness arises and for producing
@@ -190,6 +194,35 @@ period, yet the score distribution and the late rate did not move, because laten
 The monitoring rule therefore watches the score PSI, the shipping-option mix and the observed late rate, not every input.
 This also means the test period represents mostly two markets, a limit on how far the held-out numbers generalise.
 
+### 5.8 Does lateness cost repeat orders?
+
+Notebooks 1 to 4 ask which orders will be late; notebook 5 asks what lateness costs. After a late delivery, is the customer
+less likely to order again? Shipping options cannot be compared (the customer chooses, First Class is always late, Same Day
+follows the hour), but inside Standard and Second Class the real delivery time is uniform over 2 to 6 days, so orders with
+the same option and month that differ only in delivery time form a natural experiment. The question and the one primary
+test were fixed before looking at results.
+
+**Design.** One row per order (65,752 orders, 20,652 customers); outcome measured from arrival (order date plus real days):
+does the customer's next order come within 90 days? Orders without a full follow-up window are excluded. Analysis sample:
+49,888 Standard and Second Class orders from 18,389 customers. Linear model with option and month fixed effects, standard
+errors clustered by customer.
+
+| Check | Result |
+|---|---|
+| Delay random inside the option? | Real days uniform in both options (chi-square p = 0.81 and 0.97); balance test on value, earlier orders, hour, weekday, segment, market and department: p = 0.87 |
+| **Primary: each extra day, reorder within 90 days** | **-0.06 points (95% interval -0.36 to +0.24; p = 0.70); smallest detectable effect 0.43 points per day** |
+| Other windows | 30 days: 0.00 (-0.20 to +0.20); 180 days: +0.04 (-0.30 to +0.38) |
+| Late yes/no, 90 days | -0.12 points (-1.02 to +0.79) |
+| Naive late against on time | 31.29% against 31.34% (-0.05 points); designed estimate agrees, so confounding by option did not matter here |
+| Dose-response, 2 to 6 days | Standard Class -1.0 to -0.1 points, Second Class +0.1 to +1.2; every interval includes zero and the two options point in opposite directions |
+| Placebo outcomes | Days since previous order -0.22 (-1.28 to +0.84); number of earlier orders -0.0015 (-0.0105 to +0.0075); both zero |
+| Subgroups | First-time, returning and each segment: all intervals include zero (smallest p = 0.195) |
+
+Reading: no detectable effect, and the interval is informative. The base rate of reordering within 90 days is 31.3%; the
+interval rules out a decline larger than 0.36 points per extra day, which is about 1.4 points (4.6% of the base rate) across
+the four extra days between the fastest and slowest delivery. A smaller effect cannot be excluded. Because DataCo is
+synthetic, this says the method works and that nothing is built into this dataset, not that real customers ignore delays.
+
 ## 6. The app
 
 Five pages: Overview; Shipping options (real arrival days, promise designer, profit); Check an order (live scoring,
@@ -215,6 +248,8 @@ heat map, monthly trends).
   0.78 ROC-AUC, and about 41% of late orders cannot be predicted.
 - The newest 15% of orders (the test period) come almost entirely from Europe and Pacific Asia, so the held-out numbers
   say little about other markets. The rolling-origin check, which spans the whole timeline, gives the same answer.
+- The customer-impact analysis covers only Standard and Second Class (the only options with random delivery times), counts a
+  cancelled follow-up order as ordering again, and its null result on synthetic data does not say real customers ignore delays.
 - There are no supplier IDs and no shipping-cost column, so supplier ranking and cost optimisation are out of scope.
 - The cost estimate in the app depends on assumptions the user supplies; it is a reasoning aid, not a forecast.
 - Future work: test the approach on real carrier data with in-transit events (an early warning is strongest once there is
@@ -223,7 +258,7 @@ heat map, monthly trends).
 
 ## 9. Reproducibility
 
-Seed 42 (`core.py`); all splits are chronological. Run notebooks 1, 2, 3 and 4 in order, then `streamlit run app.py`. Unit
+Seed 42 (`core.py`); all splits are chronological. Run notebooks 1 to 5 in order, then `streamlit run app.py`. Unit
 tests: `python -m pytest -q`.
 
 ---
@@ -253,6 +288,11 @@ Every run that changed a decision or a number, in order. Test-set numbers are on
 | 17 | 4 | Decision curve, thresholds 0.05 to 0.95 | Net benefit differs by at most 0.0032 per order at any threshold | No decision is changed by using the model |
 | 18 | 4 | AUC inside each shipping option; calibration and AUC by market and region | Second and Standard Class 0.505; South America (592 orders) calibration error 0.057, model AUC 0.685 against table 0.713 | Nothing beyond the promise; keep the fall-back to the table for small groups |
 | 19 | 4 | PSI, train against test | Market 3.19, Department 1.14, score 0.057, quarterly late rate 0.56 to 0.59 | Input drift is not performance drift; monitor score PSI and late rate, and note the test period is mostly two markets |
+| 20 | 5 | Balance and uniformity tests for real delivery days inside Standard and Second Class | Uniform (p = 0.81, 0.97); balance p = 0.87 | Delay is as good as random inside an option; natural experiment is valid |
+| 21 | 5 | Primary: effect per extra day on reordering within 90 days (option and month fixed effects, clustered by customer) | -0.06 points (-0.36 to +0.24), smallest detectable 0.43 | No detectable effect; declines above 0.36 points per day ruled out |
+| 22 | 5 | 30 and 180 day windows; late yes/no; controls added | All intervals include zero; controls change nothing | Result does not depend on specification |
+| 23 | 5 | Dose-response and subgroups | No monotone pattern; opposite signs in the two options; smallest subgroup p = 0.195 | Consistent with no effect |
+| 24 | 5 | Placebo outcomes (days since previous order, earlier orders) | Both zero | No sign of bias in the comparison |
 
 Mistakes caught along the way: tie handling in the metrics (row 5), found by asking why a baseline looked worse than a
 lookup table; a test seed collision in an early synthetic check; and thresholds and rule names chosen before looking at
@@ -274,7 +314,8 @@ explain every part of the project; the split shows who led each piece.
 | SHAP explanations | [Name 1] | notebook 3, section 4; `core.py` section 8 |
 | Decision rules and their evaluation | [Name 2] | `core.py` section 6; notebook 3, section 5 |
 | Streamlit app and deployment | [Name 2] | `app.py`, `core.py` sections 8 and 9 |
+| Customer-impact analysis (natural experiment) | [Name 1] and [Name 2] | `core.py` section 11; notebook 5 |
 | Tests | [Name 1] and [Name 2] | `test_core.py` |
 
-Shared: choosing the datasets and the final direction, reviewing each other's work and checking the numbers in the report,
+Shared: choosing the dataset and the final direction, reviewing each other's work and checking the numbers in the report,
 and preparing for the chalk talk.

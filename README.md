@@ -13,8 +13,8 @@ them into recommended actions. A Streamlit app lets you explore all of it.
 | 1 | **Lateness is set by the promise, not by slow delivery.** Second Class takes as long as Standard Class (about 4 days) but promises 2 days instead of 4, so it is late 79.8% of the time against 39.8%. |
 | 2 | **First Class** always takes 2 days against a 1-day promise: every order is late. **Same Day** has a noon cut-off: from 12:00 it arrives the next day. |
 | 3 | **A 5-row lookup table matches LightGBM** (ROC-AUC 0.777 against 0.779). The rest of the lateness is random. |
-| 4 | **A random split inflates the score** (0.801 against 0.779), because 89% of rows are in multi-item orders. All results use a time split. |
-| 5 | **The High-risk alert is precise:** it flags 37.4% of orders, 89.8% of them are late, and it catches 58.4% of all late orders. |
+| 4 | **A random split inflates the score** (0.799 against 0.779), because 89% of rows are in multi-item orders. All results use a time split. |
+| 5 | **The High-risk alert is precise:** it flags 37.9% of orders, 89.8% of them are late, and it catches 59.1% of all late orders. |
 | 6 | **Three traps in the data:** Excel-damaged dates (39% failed to parse), leakage columns, and cancelled orders labelled "on time". |
 
 Details and the experiment log are in [`REPORT.md`](REPORT.md).
@@ -22,19 +22,25 @@ Details and the experiment log are in [`REPORT.md`](REPORT.md).
 ## The project in one picture
 
 ```
-data/raw/*.csv
+data/DataCoSupplyChainDataset.csv
      |
      v   core.py  (load, repair dates, features, time split)
- understand_the_data.ipynb     find the traps, measure each shipping option
+ 1_data_audit_and_reliability.ipynb      find the traps, prepare the data, measure each shipping option
      |
      v
- 2_build_and_test_models.ipynb   baselines -> LightGBM, delivery-time windows      -> models/models.joblib
+ 2_modelling_and_baseline.ipynb          baselines -> LightGBM, delivery-time windows   -> models/models.joblib
      |
      v
- 3_early_warning.ipynb           calibrate, risk tiers, SHAP, decision rules         -> models/app_data.joblib
+ 3_calibration_and_early_warning.ipynb   calibrate, risk tiers, SHAP, decision rules      -> models/app_data.joblib
      |
      v
- app.py                          Streamlit app that reads the two files above
+ 4_robustness_and_validation.ipynb       bootstrap CIs, rolling validation, decision curve, drift -> models/evidence.joblib
+     |
+     v
+ 5_customer_impact_of_delays.ipynb       does a late delivery change repeat orders? (natural experiment) -> models/customer_impact.joblib
+     |
+     v
+ app.py                                  Streamlit app that reads the .joblib files above
 ```
 
 ## Repository layout
@@ -43,33 +49,37 @@ data/raw/*.csv
 delivery_reliability/
 ├── README.md                       this file
 ├── REPORT.md                       final report, experiment log, who did what
-├── core.py                         ALL the logic (9 labelled sections); notebooks and app import it
-├── 1_data_and_reliability.ipynb     notebook 1
-├── 2_modelling_and_baseline.ipynb   notebook 2
-├── 3_calibration_and_early_warning.ipynb           notebook 3
-├── 4_robustness_and_validation.ipynb     notebook 4
-├── app.py                          Streamlit app (5 pages)
+├── core.py                         ALL the logic (11 labelled sections); notebooks and app import it
+├── 1_data_audit_and_reliability.ipynb      notebook 1
+├── 2_modelling_and_baseline.ipynb          notebook 2
+├── 3_calibration_and_early_warning.ipynb   notebook 3
+├── 4_robustness_and_validation.ipynb       notebook 4
+├── 5_customer_impact_of_delays.ipynb       notebook 5
+├── app.py                          Streamlit app (6 pages)
 ├── test_core.py                    unit tests for core.py
 ├── requirements.txt
 ├── .streamlit/config.toml          app theme
-├── data/raw/                       put the DataCo CSV here
-└── models/                         created by notebooks 2 and 3 (two .joblib files)
+├── data/                           put the DataCo CSV here
+└── models/                         created by notebooks 2 to 5 (.joblib files)
 ```
 
 `core.py` is organised as: 1 Settings, 2 Loading, 3 Splitting, 4 Metrics, 5 Models, 6 Early warning, 7 Analysis,
-8 Order scoring, 9 App data. Read it top to bottom; it follows the order the project happens in.
+8 Order scoring, 9 App data, 10 Deeper checks, 11 Customer impact. Read it top to bottom; it follows the order the project happens in.
 
 ## Setup
+
+Python 3.12 is recommended (the saved models were trained with the versions pinned in `requirements.txt`).
 
 ```
 pip install -r requirements.txt
 ```
 
-Put `DataCoSupplyChainDataset.csv` in `data/raw/`.
+**Data:** `data/DataCoSupplyChainDataset.csv` is included in the repository. It is the *DataCo Smart Supply Chain for Big Data
+Analysis* dataset (Constante, Silva and Pereira, Mendeley Data), a synthetic dataset. If you need to download it again, put the CSV in `data/`.
 
 ## Run
 
-1. Open and run the notebooks **in order**: 1, then 2, then 3 (2 takes a few minutes: it tunes LightGBM).
+1. Open and run the notebooks **in order**, 1 to 5. Notebook 2 takes a few minutes (it tunes LightGBM) and notebook 4 a few more (it refits the model five times). Notebook 5 is independent of 2 to 4 and only needs the data.
 2. `streamlit run app.py`
 3. Tests: `python -m pytest -q`
 
@@ -81,6 +91,7 @@ Put `DataCoSupplyChainDataset.csv` in `data/raw/`.
 | Shipping options | When each option really arrives; promise designer; profit by option |
 | Check an order | Score one order: chance of being late, delivery window, recommended action, SHAP drivers, every option compared |
 | Early warnings | Alert threshold, precision and recall, cost of mistakes, tiers, calibration, watchlist |
+| Evidence | Is the model really no better than the 5-row table? Bootstrap, rolling validation, decision curve, groups, drift (needs notebook 4) |
 | Where and when | Region / market / department fairness after controlling for shipping mode; weekday-hour heat map; trends |
 
 ## Deploy (Streamlit Community Cloud)
@@ -105,4 +116,4 @@ Put `DataCoSupplyChainDataset.csv` in `data/raw/`.
 ## Limitations
 
 DataCo is synthetic: lateness comes from the promise and the Same Day cut-off plus random noise, so about 0.78 ROC-AUC
-is the ceiling and about 42% of late orders cannot be predicted. There are no supplier IDs or shipping costs.
+is the ceiling and about 41% of late orders cannot be predicted. There are no supplier IDs or shipping costs.

@@ -1,0 +1,5 @@
+Shipping Mode,orders,promised_days,mean_real_days,std_real_days,late_rate,late_ci_low,late_ci_high,avg_days_late_if_late,profit_per_order,sales_per_item,profit_ci95
+Standard Class,103153,4.0,3.994,1.419,0.398,0.395,0.401,1.507,22.033,204.462,0.639
+Same Day,9293,0.0,0.479,0.5,0.479,0.469,0.489,1.0,20.896,199.599,2.01
+Second Class,33806,2.0,3.993,1.414,0.798,0.794,0.803,2.497,21.383,202.942,1.147
+First Class,26513,1.0,2.0,0.0,1.0,1.0,1.0,1.0,23.256,203.978,1.21

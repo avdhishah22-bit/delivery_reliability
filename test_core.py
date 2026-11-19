@@ -266,4 +266,64 @@ def test_calibration_error_and_psi():
     assert psi(a, r.normal(size=5000)) < 0.05
     assert psi(a, r.normal(2, 1, 5000)) > 0.25
     assert psi(pd.Series(["x"] * 90 + ["y"] * 10), pd.Series(["x"] * 50 + ["y"] * 50)) > 0.25
-    
+
+
+# ---------------------------------------------------------------- customer impact (notebook 5)
+def _orders(effect=0.0, n=20000, seed=3):
+    """Simulated orders: real days random 2..6; customers reorder with probability 0.5 + effect * (days - 2)."""
+    r = np.random.default_rng(seed)
+    days = r.integers(2, 7, n)
+    cust = r.integers(0, n // 3, n)
+    p = np.clip(0.5 + effect * (days - 2), 0, 1)
+    return pd.DataFrame({core.CUSTOMER: cust, "days": days.astype(float), "reorder_90": (r.random(n) < p).astype(float),
+                         core.MODE: "Standard Class", "month": r.choice(["a", "b", "c"], n)})
+
+
+def test_ols_cluster_matches_lstsq_and_hc1_for_singleton_clusters():
+    r = np.random.default_rng(0)
+    X = np.column_stack([np.ones(300), r.normal(size=300)])
+    y = 2 + 3 * X[:, 1] + r.normal(size=300)
+    beta, cov = core.ols_cluster(y, X, np.arange(300))
+    assert np.allclose(beta, np.linalg.lstsq(X, y, rcond=None)[0])
+    e = y - X @ beta
+    bread = np.linalg.inv(X.T @ X)
+    hc1 = 300 / 298 * bread @ (X.T * e ** 2) @ X @ bread
+    assert np.allclose(cov, hc1, rtol=1e-6)
+
+
+def test_effect_of_delay_recovers_a_known_effect_and_a_null():
+    hit = core.effect_of_delay(_orders(effect=-0.03), "reorder_90", "days", fe=(core.MODE, "month"))
+    assert hit["lo"] < -0.03 < hit["hi"] and hit["p"] < 0.001
+    null = core.effect_of_delay(_orders(effect=0.0), "reorder_90", "days", fe=(core.MODE, "month"))
+    assert abs(null["coef"]) < 3 * null["se"] and null["mde"] == 2.8 * null["se"]
+
+
+def test_dose_response_levels_and_reference():
+    out = core.dose_response(_orders(effect=-0.05), "reorder_90", "days", fe=("month",))
+    assert list(out["real days"]) == [2.0, 3.0, 4.0, 5.0, 6.0] and out.loc[0, "difference"] == 0
+    assert out["difference"].iloc[-1] < -0.1                 # 4 extra days at -0.05 each
+
+
+def test_balance_test_passes_when_random_and_fails_when_confounded():
+    d = _orders()
+    d["x"] = np.random.default_rng(9).normal(size=len(d))
+    assert core.balance_test(d, "days", numeric=["x"], fe=(core.MODE, "month"))["p"] > 0.01
+    d["x"] = d["days"] + np.random.default_rng(9).normal(size=len(d))      # x now predicts delay
+    assert core.balance_test(d, "days", numeric=["x"], fe=(core.MODE, "month"))["p"] < 0.001
+
+
+def test_add_followup_counts_only_orders_after_arrival():
+    t0 = pd.Timestamp("2016-01-01")
+    items = pd.DataFrame({
+        core.ORDER: [1, 2, 3, 4], core.CUSTOMER: [7, 7, 7, 8],
+        core.DATE: [t0, t0 + pd.Timedelta(days=1), t0 + pd.Timedelta(days=10), t0 + pd.Timedelta(days=300)],
+        core.MODE: "Standard Class", core.PROMISE: 4, core.TARGET_DAYS: [5, 2, 3, 2],
+        "Delivery Status": "Late delivery", "Sales": 10.0, "Customer Segment": "Consumer", "Market": "Europe", "Department Name": "Golf"})
+    o = core.add_followup(core.order_table(items), windows=(30, 90))
+    first = o[o[core.ORDER] == 1].iloc[0]           # arrives day 5; order 2 (day 1) came before arrival; order 3 (day 10) is the next
+    assert first["days_to_next"] == 5 and first["reorder_30"] == 1
+    assert first["prior_orders"] == 0 and o[o[core.ORDER] == 3].iloc[0]["prior_orders"] == 2
+    assert o[o[core.ORDER] == 3].iloc[0]["reorder_30"] == 0         # no later order
+    assert bool(o[o[core.ORDER] == 4].iloc[0]["followup_90"]) is False     # data ends before 90 days after arrival
+    assert bool(first["followup_90"]) is True
+    assert core.order_consistency(items).max() == 0

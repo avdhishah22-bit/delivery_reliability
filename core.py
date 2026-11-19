@@ -10,6 +10,7 @@
     8. Order scoring   what the Streamlit app calls for one order (incl. SHAP)
     9. App data        everything the app needs, saved once from notebook 3
    10. Deeper checks   bootstrap intervals, rolling validation, decision curve, calibration error, drift (notebook 4)
+   11. Customer impact do late deliveries change what customers do next? (notebook 5)
 
 The notebooks and app.py import from here; test_core.py tests it.
 """
@@ -17,6 +18,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.isotonic import IsotonicRegression
@@ -580,3 +582,113 @@ def psi(reference, current, bins: int = 10) -> float:
         b = np.array([(cur == c).mean() for c in cats])
     a, b = np.clip(a, 1e-4, None), np.clip(b, 1e-4, None)
     return float(np.sum((b - a) * np.log(b / a)))
+
+
+# =====================================================================================
+# 11. CUSTOMER IMPACT OF DELAYS (notebook 5)
+# =====================================================================================
+CUSTOMER = "Customer Id"
+ORDER = "Order Id"
+
+
+def order_table(df: pd.DataFrame) -> pd.DataFrame:
+    """One row per order (DataCo has one row per item). Keeps cancelled orders too: a customer who orders again
+    after a cancelled order still ordered again. Lateness is recomputed from days (real above promised)."""
+    g = df.groupby(ORDER, sort=False)
+    out = pd.DataFrame({
+        CUSTOMER: g[CUSTOMER].first(), DATE: g[DATE].min(), MODE: g[MODE].first(), PROMISE: g[PROMISE].first(),
+        TARGET_DAYS: g[TARGET_DAYS].first(), "cancelled": g["Delivery Status"].first().eq("Shipping canceled"),
+        "value": g["Sales"].sum(), "segment": g["Customer Segment"].first(), "market": g["Market"].first(),
+        "department": g["Department Name"].first()}).reset_index()
+    out["late"] = (out[TARGET_DAYS] > out[PROMISE]).astype(int)
+    return out.sort_values([CUSTOMER, DATE, ORDER]).reset_index(drop=True)
+
+
+def order_consistency(df: pd.DataFrame, cols=(MODE, PROMISE, TARGET_DAYS, CUSTOMER)) -> pd.Series:
+    """Share of orders whose items disagree on a column. Should be about 0 for the columns taken from the first item."""
+    g = df.groupby(ORDER)
+    return pd.Series({c: float((g[c].nunique(dropna=False) > 1).mean()) for c in cols})
+
+
+def add_followup(orders: pd.DataFrame, windows=(30, 90, 180)) -> pd.DataFrame:
+    """Follow-up behaviour measured from ARRIVAL (order date + real days), because a reaction to a delay cannot come
+    before the parcel arrives. next_date is the customer's first later order placed strictly after arrival.
+    reorder_W = 1 if that order is within W days of arrival. followup_W = False when the data ends before the window does."""
+    o = orders.copy()
+    o["arrival"] = o[DATE] + pd.to_timedelta(o[TARGET_DAYS], unit="D")
+    o["prior_orders"] = o.groupby(CUSTOMER).cumcount()
+    o["days_since_prev"] = (o[DATE] - o.groupby(CUSTOMER)[DATE].shift(1)).dt.total_seconds() / 86400
+    later = o[[CUSTOMER, DATE]].rename(columns={DATE: "next_date"}).sort_values("next_date")
+    left = o[[ORDER, CUSTOMER, "arrival"]].sort_values("arrival")
+    nxt = pd.merge_asof(left, later, left_on="arrival", right_on="next_date", by=CUSTOMER,
+                        direction="forward", allow_exact_matches=False)[[ORDER, "next_date"]]
+    o = o.merge(nxt, on=ORDER, how="left")
+    o["days_to_next"] = (o["next_date"] - o["arrival"]).dt.total_seconds() / 86400
+    end = o[DATE].max()
+    for w in windows:
+        o[f"reorder_{w}"] = (o["days_to_next"] <= w).astype(float)
+        o[f"followup_{w}"] = o["arrival"] + pd.Timedelta(days=w) <= end
+    return o.sort_values([CUSTOMER, DATE, ORDER]).reset_index(drop=True)
+
+
+def ols_cluster(y, X, groups):
+    """Least squares with cluster-robust (CR1) standard errors. Returns coefficients and their covariance matrix."""
+    X, y = np.asarray(X, float), np.asarray(y, float)
+    n, k = X.shape
+    bread = np.linalg.pinv(X.T @ X)
+    beta = bread @ X.T @ y
+    codes = pd.factorize(np.asarray(groups))[0]
+    G = int(codes.max()) + 1
+    s = pd.DataFrame(X * (y - X @ beta)[:, None]).groupby(codes).sum().to_numpy()
+    cov = (G / max(G - 1, 1)) * ((n - 1) / max(n - k, 1)) * bread @ (s.T @ s) @ bread
+    return beta, cov
+
+
+def _design(d: pd.DataFrame, first: list, fe=(), numeric=(), categorical=()) -> pd.DataFrame:
+    parts = [pd.Series(1.0, index=d.index, name="const"), d[first].astype(float)]
+    parts += [d[list(numeric)].astype(float)] if len(numeric) else []
+    for c in list(fe) + list(categorical):
+        parts.append(pd.get_dummies(d[c], prefix=c, drop_first=True, dtype=float))
+    return pd.concat(parts, axis=1)
+
+
+def effect_of_delay(frame: pd.DataFrame, outcome: str, exposure: str, fe=(MODE, "month"), numeric=(), categorical=(),
+                    cluster: str = CUSTOMER) -> dict:
+    """Coefficient on `exposure` in a linear model with fixed effects (cells where orders are comparable), clustered by
+    customer. mde is the smallest true effect detectable with 80% power at the 5% level (2.8 standard errors)."""
+    d = frame.dropna(subset=[outcome, exposure] + list(numeric))
+    X = _design(d, [exposure], fe, numeric, categorical)
+    beta, cov = ols_cluster(d[outcome], X.to_numpy(), d[cluster].to_numpy())
+    b, se = float(beta[1]), float(np.sqrt(cov[1, 1]))
+    p = float(2 * (1 - stats.norm.cdf(abs(b / se)))) if se > 0 else float("nan")
+    return {"coef": b, "se": se, "lo": b - 1.96 * se, "hi": b + 1.96 * se, "p": p, "mde": 2.8 * se,
+            "n": int(len(d)), "customers": int(d[cluster].nunique()), "mean_outcome": float(d[outcome].mean())}
+
+
+def balance_test(frame: pd.DataFrame, exposure: str, numeric=(), categorical=(), fe=(MODE, "month"),
+                 cluster: str = CUSTOMER) -> dict:
+    """If delay is as good as random inside a fixed-effect cell, order characteristics cannot predict it.
+    Regresses the exposure on them and tests that they are jointly zero (cluster-robust Wald test)."""
+    d = frame.dropna(subset=[exposure] + list(numeric))
+    X = _design(d.assign(_one=1.0), ["_one"], fe, numeric, categorical).drop(columns=["_one"])
+    beta, cov = ols_cluster(d[exposure], X.to_numpy(), d[cluster].to_numpy())
+    idx = [i for i, c in enumerate(X.columns) if c in set(numeric) or any(c.startswith(f"{k}_") for k in categorical)]
+    b, V = beta[idx], cov[np.ix_(idx, idx)]
+    wald = float(b @ np.linalg.pinv(V) @ b)
+    return {"wald": wald, "df": len(idx), "p": float(1 - stats.chi2.cdf(wald, len(idx)))}
+
+
+def dose_response(frame: pd.DataFrame, outcome: str, days: str = TARGET_DAYS, fe=("month",), cluster: str = CUSTOMER) -> pd.DataFrame:
+    """Outcome difference for each real-days level against the shortest level, with 95% intervals."""
+    d = frame.dropna(subset=[outcome, days])
+    levels = sorted(d[days].unique())
+    dum = pd.get_dummies(d[days], prefix="days", dtype=float).drop(columns=f"days_{levels[0]}")
+    X = pd.concat([pd.Series(1.0, index=d.index, name="const"), dum] +
+                  [pd.get_dummies(d[c], prefix=c, drop_first=True, dtype=float) for c in fe], axis=1)
+    beta, cov = ols_cluster(d[outcome], X.to_numpy(), d[cluster].to_numpy())
+    rows = [{"real days": levels[0], "difference": 0.0, "lo": 0.0, "hi": 0.0, "orders": int((d[days] == levels[0]).sum())}]
+    for i, lv in enumerate(levels[1:], start=1):
+        se = float(np.sqrt(cov[i, i]))
+        rows.append({"real days": lv, "difference": float(beta[i]), "lo": float(beta[i] - 1.96 * se),
+                     "hi": float(beta[i] + 1.96 * se), "orders": int((d[days] == lv).sum())})
+    return pd.DataFrame(rows)

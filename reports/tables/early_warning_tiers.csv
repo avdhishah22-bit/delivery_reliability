@@ -1,0 +1,4 @@
+tier,orders,late_rate,late_orders,share_of_orders,share_of_late_orders
+High,9699,0.898,8714,0.374,0.584
+Medium,15572,0.399,6212,0.601,0.416
+Low,644,0.006,4,0.025,0.0
